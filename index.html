@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Kids Tables - Quiz & Voice</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  body { font-family: Arial, Helvetica, sans-serif; background-color: #fff3e0; text-align: center; padding: 20px; margin: 0; }
+  h1 { color: #e65100; margin-bottom: 5px; }
+  p { font-size: 18px; margin-bottom: 15px; }
+  input, select { font-size: 18px; padding: 5px; border-radius: 8px; margin: 5px; width: 200px; }
+
+  .buttons, .quiz-buttons { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; max-width: 360px; margin: auto; }
+  button { font-size: 22px; padding: 18px; border-radius: 15px; border: none; background-color: #ff9800; color: white; cursor: pointer; transition: transform 0.1s; }
+  button:active { transform: scale(0.97); }
+  .correct { background-color: #4caf50 !important; color: white; }
+  .wrong { background-color: #f44336 !important; color: white; }
+
+  .table, .quiz-question, .stars, .level { margin-top: 25px; font-size: 24px; line-height: 1.6; }
+  .stars { color: gold; font-size: 30px; }
+  .level { color: #e65100; font-size: 20px; margin-top: 5px; }
+
+  .voice-controls { margin-top: 15px; }
+  .voice-controls button { font-size: 20px; padding: 10px; margin: 2px; }
+</style>
+</head>
+<body>
+
+<h1>Learn Tables</h1>
+
+<p>Enter your name (optional): <input type="text" id="user-name" placeholder="Your Name"></p>
+<p>Choose Voice: 
+<select id="voice-select">
+  <option value="">Default</option>
+</select>
+</p>
+
+<!-- Table Buttons -->
+<div class="buttons" id="buttons"></div>
+
+<!-- Table Display -->
+<div class="table" id="table"></div>
+<button id="read-aloud-btn" style="margin-top:10px; display:none;">🔊 Read Aloud</button>
+
+<!-- Voice Control -->
+<div class="voice-controls">
+  <button id="play-btn">▶ Play</button>
+  <button id="pause-btn">⏸ Pause</button>
+  <button id="stop-btn">⏹ Stop</button>
+  <button id="restart-btn">🔄 Restart</button>
+</div>
+
+<!-- Quiz -->
+<div class="quiz-question" id="quiz-question"></div>
+<div class="quiz-buttons" id="quiz-buttons"></div>
+
+<!-- Stars & Level -->
+<div class="stars" id="stars"></div>
+<div class="level" id="level"></div>
+
+<script>
+// ---------------- Voice Setup ----------------
+const voiceSelect = document.getElementById("voice-select");
+let availableVoices = [];
+
+function populateVoices() {
+  availableVoices = window.speechSynthesis.getVoices();
+  voiceSelect.innerHTML = '<option value="">Default</option>';
+  availableVoices.forEach((voice,index)=>{
+    const option = document.createElement("option");
+    option.value = index;
+    option.textContent = `${voice.name} (${voice.lang})`;
+    voiceSelect.appendChild(option);
+  });
+}
+
+window.speechSynthesis.onvoiceschanged = populateVoices;
+populateVoices();
+
+function speak(text){
+  const msg = new SpeechSynthesisUtterance(text);
+  msg.rate = 0.8;
+  const voices = window.speechSynthesis.getVoices();
+  const selectedIndex = voiceSelect.value;
+
+  if(selectedIndex !== "") {
+    msg.voice = voices[selectedIndex];
+  } else {
+    // fallback female voice
+    const femaleVoice = voices.find(v => /female/i.test(v.name));
+    if(femaleVoice) msg.voice = femaleVoice;
+  }
+  window.speechSynthesis.speak(msg);
+}
+
+// ---------------- Voice Controls ----------------
+const readBtn = document.getElementById("read-aloud-btn");
+const playBtn = document.getElementById("play-btn");
+const pauseBtn = document.getElementById("pause-btn");
+const stopBtn = document.getElementById("stop-btn");
+const restartBtn = document.getElementById("restart-btn");
+
+playBtn.onclick = () => window.speechSynthesis.resume();
+pauseBtn.onclick = () => window.speechSynthesis.pause();
+stopBtn.onclick = () => window.speechSynthesis.cancel();
+restartBtn.onclick = () => { window.speechSynthesis.cancel(); readBtn.click(); };
+
+// ---------------- Tables ----------------
+const buttonsDiv = document.getElementById("buttons");
+const tableDiv = document.getElementById("table");
+for(let n=1;n<=20;n++){
+  const btn=document.createElement("button");
+  btn.textContent=n;
+  btn.onclick=function(){ showTable(n); };
+  buttonsDiv.appendChild(btn);
+}
+
+function showTable(num){
+  tableDiv.innerHTML="";
+  document.getElementById("quiz-question").innerHTML="";
+  document.getElementById("quiz-buttons").innerHTML="";
+  readBtn.style.display="inline-block";
+  for(let i=1;i<=10;i++){
+    tableDiv.innerHTML += `${num} × ${i} = ${num*i}<br>`;
+  }
+  const name = document.getElementById("user-name").value || "Kid";
+  speak(`${name}, here is the table of ${num}. ${num} times 1 equals ${num*1}`);
+}
+
+// Read aloud button
+readBtn.onclick = function() {
+  const text = tableDiv.innerText;
+  speak(text);
+}
+
+// ---------------- Quiz ----------------
+const quizQuestionDiv = document.getElementById("quiz-question");
+const quizButtonsDiv = document.getElementById("quiz-buttons");
+const starsDiv = document.getElementById("stars");
+const levelDiv = document.getElementById("level");
+
+let stars=0;
+let dailyLevel=1;
+
+function startQuiz(){
+  tableDiv.innerHTML="";
+  quizQuestionDiv.innerHTML="";
+  quizButtonsDiv.innerHTML="";
+  generateQuestion();
+}
+
+function generateQuestion(){
+  const tableNumber = Math.floor(Math.random()*20)+1;
+  const multiplier = Math.floor(Math.random()*10)+1;
+  const correctAnswer = tableNumber*multiplier;
+
+  let wrong1 = correctAnswer + Math.floor(Math.random()*5 +1);
+  let wrong2 = correctAnswer - Math.floor(Math.random()*5 +1);
+  if(wrong2<=0) wrong2 = correctAnswer+2;
+
+  const options = shuffle([correctAnswer,wrong1,wrong2]);
+  const name = document.getElementById("user-name").value || "Kid";
+
+  quizQuestionDiv.textContent = `${name}, what is ${tableNumber} × ${multiplier}?`;
+  speak(quizQuestionDiv.textContent);
+
+  quizButtonsDiv.innerHTML="";
+  options.forEach(opt=>{
+    const btn=document.createElement("button");
+    btn.textContent=opt;
+    btn.onclick=function(){ checkAnswer(btn,opt,correctAnswer); };
+    quizButtonsDiv.appendChild(btn);
+  });
+}
+
+function checkAnswer(btn,selected,correct){
+  if(selected===correct){
+    stars++;
+    btn.classList.add("correct");
+    starsDiv.textContent="⭐".repeat(stars);
+    speak("Correct!");
+    if(stars%10===0) dailyLevel++;
+    levelDiv.textContent=`Daily Level: ${dailyLevel}`;
+  }else{
+    btn.classList.add("wrong");
+    speak(`Wrong! Correct is ${correct}`);
+  }
+
+  const buttons = quizButtonsDiv.querySelectorAll("button");
+  buttons.forEach(b=>b.disabled=true);
+  setTimeout(generateQuestion,1000);
+}
+
+function shuffle(array){
+  for(let i=array.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [array[i],array[j]]=[array[j],array[i]];
+  }
+  return array;
+}
+
+// Add quiz start button
+const quizStartBtn = document.createElement("button");
+quizStartBtn.textContent="Start Quiz (Random Table)";
+quizStartBtn.onclick=startQuiz;
+buttonsDiv.appendChild(quizStartBtn);
+
+// Initialize stars & level
+starsDiv.textContent="";
+levelDiv.textContent=`Daily Level: ${dailyLevel}`;
+</script>
+</body>
+</html>
